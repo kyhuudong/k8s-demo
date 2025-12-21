@@ -7,6 +7,30 @@ echo "Building and Deploying NestJS API"
 echo "========================================="
 echo ""
 
+# Check prerequisites
+echo "Checking prerequisites..."
+
+# Check if Docker is running
+if ! docker ps &> /dev/null; then
+    echo "❌ Error: Docker is not running!"
+    echo ""
+    echo "Please start Docker Desktop or Docker daemon first."
+    echo ""
+    exit 1
+fi
+echo "✓ Docker is running"
+
+# Check if kubectl is installed
+if ! command -v kubectl &> /dev/null; then
+    echo "❌ Error: kubectl is not installed!"
+    echo ""
+    echo "Please run the complete demo first:"
+    echo "  bash run-demo.sh"
+    echo ""
+    exit 1
+fi
+echo "✓ kubectl is installed"
+
 # Check if Minikube is running (required)
 if ! minikube status &> /dev/null; then
     echo "❌ Error: Minikube is not running!"

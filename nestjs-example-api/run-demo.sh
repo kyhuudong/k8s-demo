@@ -8,6 +8,44 @@ echo "Complete Automation Script"
 echo "========================================="
 echo ""
 
+# Check prerequisites
+echo "Checking prerequisites..."
+echo ""
+
+# Check if Docker is installed and running
+if ! command -v docker &> /dev/null; then
+    echo "❌ Error: Docker is not installed!"
+    echo ""
+    echo "Please install Docker first:"
+    echo "  macOS: https://docs.docker.com/desktop/install/mac-install/"
+    echo "  Linux: https://docs.docker.com/engine/install/"
+    echo ""
+    exit 1
+fi
+
+if ! docker ps &> /dev/null; then
+    echo "❌ Error: Docker is not running!"
+    echo ""
+    echo "Please start Docker Desktop or Docker daemon first."
+    echo ""
+    exit 1
+fi
+echo "✓ Docker is installed and running"
+
+# Check if curl is installed (needed for downloading kubectl/minikube)
+if ! command -v curl &> /dev/null; then
+    echo "❌ Error: curl is not installed!"
+    echo ""
+    echo "Please install curl first:"
+    echo "  macOS: brew install curl"
+    echo "  Alpine: apk add curl"
+    echo "  Ubuntu/Debian: apt-get install curl"
+    echo ""
+    exit 1
+fi
+echo "✓ curl is installed"
+echo ""
+
 # Make all scripts executable
 echo "Making scripts executable..."
 chmod +x run-demo.sh 2>/dev/null || true
