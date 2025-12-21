@@ -7,44 +7,123 @@ echo "Building and Deploying NestJS API"
 echo "========================================="
 echo ""
 
-# Build Docker image
-echo "1. Building Docker image..."
+# Step 1: Build the Docker image locally
+echo "Step 1: Building Docker image..."
 docker build -t nestjs-api:v1 .
 echo "✓ Docker image built successfully"
 echo ""
 
-# Load image into Minikube
-echo "2. Loading image into Minikube..."
+# Step 2: Load the image into Minikube
+echo "Step 2: Loading image into Minikube..."
 minikube image load nestjs-api:v1
 echo "✓ Image loaded into Minikube"
 echo ""
 
-# Deploy MySQL ConfigMap
-echo "3. Deploying MySQL ConfigMap..."
+# Step 3: Deploy MySQL using manifests (infrastructure first)
+echo "Step 3: Deploying MySQL database..."
 kubectl apply -f k8s/mysql-configmap.yaml
-echo "✓ MySQL ConfigMap deployed"
-echo ""
-
-# Deploy MySQL
-echo "4. Deploying MySQL..."
 kubectl apply -f k8s/mysql-deployment.yaml
-echo "✓ MySQL deployment and service created"
+echo "✓ MySQL ConfigMap and Deployment applied"
 echo ""
 
 # Wait for MySQL to be ready
-echo "5. Waiting for MySQL to be ready..."
+echo "Step 4: Waiting for MySQL to be ready..."
 kubectl wait --for=condition=ready pod -l app=mysql --timeout=120s
 echo "✓ MySQL is ready"
 echo ""
 
-# Deploy NestJS API
-echo "6. Deploying NestJS API..."
-kubectl apply -f k8s/nestjs-deployment.yaml
-echo "✓ NestJS API deployment and service created"
+# Step 5: Create base NestJS deployment (using kubectl create)
+echo "Step 5: Creating base NestJS deployment..."
+if kubectl get deployment nestjs-api &> /dev/null; then
+    echo "⚠ Deployment already exists, deleting first..."
+    kubectl delete deployment nestjs-api
+    kubectl delete service nestjs-api 2>/dev/null || true
+    sleep 5
+fi
+
+kubectl create deployment nestjs-api --image=nginx
+echo "✓ Base deployment created"
+echo ""
+
+# Step 6: Expose the deployment to the network
+echo "Step 6: Exposing deployment as NodePort service..."
+kubectl expose deployment nestjs-api --type=NodePort --port=3000
+echo "✓ Service created"
+echo ""
+
+# Step 7: Patch to use our custom image and configuration
+echo "Step 7: Patching deployment to use NestJS image with full configuration..."
+kubectl patch deployment nestjs-api --patch '{
+  "spec": {
+    "replicas": 3,
+    "template": {
+      "spec": {
+        "containers": [{
+          "name": "nginx",
+          "image": "nestjs-api:v1",
+          "imagePullPolicy": "Never",
+          "ports": [{
+            "containerPort": 3000,
+            "name": "http"
+          }],
+          "env": [
+            {"name": "HOST", "value": "0.0.0.0"},
+            {"name": "PORT", "value": "3000"},
+            {"name": "DOMAIN_URL", "value": "http://localhost:3000"},
+            {"name": "TYPEORM_HOST", "value": "mysql"},
+            {"name": "TYPEORM_PORT", "value": "3306"},
+            {"name": "TYPEORM_DATABASE", "value": "testdb"},
+            {"name": "TYPEORM_USERNAME", "value": "userdb"},
+            {"name": "TYPEORM_PASSWORD", "value": "password"},
+            {"name": "TYPEORM_LOGGING", "value": "false"},
+            {"name": "TYPEORM_SYNCHRONIZE", "value": "true"}
+          ],
+          "livenessProbe": {
+            "httpGet": {
+              "path": "/",
+              "port": 3000
+            },
+            "initialDelaySeconds": 30,
+            "periodSeconds": 10,
+            "timeoutSeconds": 5,
+            "failureThreshold": 3
+          },
+          "readinessProbe": {
+            "httpGet": {
+              "path": "/",
+              "port": 3000
+            },
+            "initialDelaySeconds": 10,
+            "periodSeconds": 5,
+            "timeoutSeconds": 3,
+            "failureThreshold": 3
+          },
+          "resources": {
+            "requests": {
+              "memory": "256Mi",
+              "cpu": "250m"
+            },
+            "limits": {
+              "memory": "512Mi",
+              "cpu": "500m"
+            }
+          }
+        }]
+      }
+    }
+  }
+}'
+echo "✓ Deployment patched with NestJS configuration"
+echo ""
+
+# Step 8: Patch the service to use nodePort 30080
+echo "Step 8: Updating service to use fixed NodePort..."
+kubectl patch service nestjs-api --type='json' -p='[{"op": "replace", "path": "/spec/ports/0/nodePort", "value": 30080}]'
+echo "✓ Service updated with NodePort 30080"
 echo ""
 
 # Wait for API pods to be ready
-echo "7. Waiting for NestJS API pods to be ready..."
+echo "Step 9: Waiting for NestJS API pods to be ready..."
 kubectl wait --for=condition=ready pod -l app=nestjs-api --timeout=120s
 echo "✓ NestJS API pods are ready"
 echo ""
@@ -76,11 +155,12 @@ MINIKUBE_IP=$(minikube ip)
 echo "Minikube IP: $MINIKUBE_IP"
 echo "NestJS API URL: http://$MINIKUBE_IP:30080"
 echo "Swagger Docs: http://$MINIKUBE_IP:30080/docs"
+echo "Products API: http://$MINIKUBE_IP:30080/products"
 echo ""
 
 echo "Or use port-forward to access via localhost:"
-echo "  kubectl port-forward service/nestjs-api 3000:3000"
-echo "  Then access: http://localhost:3000"
+echo "  kubectl port-forward --address 0.0.0.0 service/nestjs-api 8080:3000"
+echo "  Then access: http://localhost:8080"
 echo ""
 
 echo "✓ Deployment complete!"
