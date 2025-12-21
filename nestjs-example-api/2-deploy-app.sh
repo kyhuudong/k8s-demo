@@ -7,6 +7,24 @@ echo "Building and Deploying NestJS API"
 echo "========================================="
 echo ""
 
+# Step 0: Check if Minikube is running
+echo "Step 0: Checking Minikube status..."
+if ! minikube status &> /dev/null; then
+    echo "⚠ Minikube is not running. Starting Minikube..."
+    minikube start --driver=docker --force
+    echo "✓ Minikube started"
+else
+    echo "✓ Minikube is running"
+fi
+echo ""
+
+# Step 0.5: Clean up Docker to free space
+echo "Step 0.5: Cleaning up Docker to free disk space..."
+echo "Removing unused Docker images, containers, and build cache..."
+docker system prune -f --volumes 2>/dev/null || true
+echo "✓ Docker cleanup complete"
+echo ""
+
 # Step 1: Build the Docker image locally
 echo "Step 1: Building Docker image..."
 docker build -t nestjs-api:v1 .
@@ -28,7 +46,17 @@ echo ""
 
 # Wait for MySQL to be ready
 echo "Step 4: Waiting for MySQL to be ready..."
-kubectl wait --for=condition=ready pod -l app=mysql --timeout=120s
+echo "This may take a minute while MySQL initializes..."
+if ! kubectl wait --for=condition=ready pod -l app=mysql --timeout=300s; then
+    echo "⚠ MySQL pod failed to become ready. Checking pod status..."
+    kubectl get pods -l app=mysql
+    echo ""
+    echo "Pod logs:"
+    kubectl logs -l app=mysql --tail=50 || true
+    echo ""
+    echo "❌ MySQL deployment failed. Please check the logs above."
+    exit 1
+fi
 echo "✓ MySQL is ready"
 echo ""
 
