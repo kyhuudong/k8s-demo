@@ -8,22 +8,39 @@ echo "Complete Automation Script"
 echo "========================================="
 echo ""
 
+# Make all scripts executable
+echo "Making scripts executable..."
+chmod +x run-demo.sh 2>/dev/null || true
+chmod +x 2-deploy-app.sh 2>/dev/null || true
+chmod +x 3-chaos-test.sh 2>/dev/null || true
+chmod +x check-status.sh 2>/dev/null || true
+echo "✓ Scripts are executable"
+echo ""
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo "This script will:"
-echo "  1. Setup Kubernetes cluster (Minikube)"
+echo "  0. Clean up Docker/Minikube (optional)"
+echo "  1. Setup Kubernetes cluster (kubectl + minikube)"
 echo "  2. Build and deploy NestJS API with MySQL"
 echo "  3. Run chaos testing to demonstrate resilience"
 echo ""
 
-read -p "Do you want to proceed? (y/n) " -n 1 -r
+read -p "Do you want to clean up Docker first to free disk space? (y/n) " -n 1 -r
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 1
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "========================================="
+    echo "Step 0: Cleaning up Docker & Minikube"
+    echo "========================================="
+    echo ""
+    echo "Removing unused Docker resources..."
+    docker system prune -f --volumes 2>/dev/null || true
+    echo "✓ Docker cleanup complete"
+    echo ""
 fi
 
 echo ""
@@ -32,9 +49,43 @@ echo "Step 1: Setting up Kubernetes Cluster"
 echo "========================================="
 echo ""
 
-./1-setup-cluster.sh
+# Check if Minikube is running
+if ! minikube status &> /dev/null; then
+    echo "Installing dependencies and starting Minikube..."
+    echo ""
+
+    # Install Alpine dependencies (skip if not Alpine)
+    apk add --no-cache gcompat conntrack-tools 2>/dev/null || echo "⚠ Skipping Alpine dependencies"
+
+    # Install kubectl if needed
+    if ! command -v kubectl &> /dev/null; then
+        echo "Installing kubectl..."
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+    fi
+
+    # Install minikube if needed
+    if ! command -v minikube &> /dev/null; then
+        echo "Installing minikube..."
+        curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        install minikube-linux-amd64 /usr/local/bin/minikube
+        rm -f minikube-linux-amd64
+    fi
+
+    # Start minikube
+    echo "Starting Minikube cluster..."
+    minikube start --driver=docker --force
+else
+    echo "✓ Minikube is already running"
+fi
 
 echo ""
+kubectl cluster-info
+echo ""
+kubectl get nodes
+echo ""
+
 echo -e "${GREEN}✓ Cluster setup complete!${NC}"
 echo ""
 read -p "Press Enter to continue to deployment..."
