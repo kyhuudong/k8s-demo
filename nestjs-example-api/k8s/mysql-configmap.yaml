@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-initdb-config
+data:
+  init-db.sql: |
+    -- Create database if not exists
+    CREATE DATABASE IF NOT EXISTS testdb;
+
+    -- Create user and grant privileges from any host
+    CREATE USER IF NOT EXISTS 'userdb'@'%' IDENTIFIED BY 'password';
+    GRANT ALL PRIVILEGES ON testdb.* TO 'userdb'@'%';
+    FLUSH PRIVILEGES;
+
+    -- Switch to testdb database
+    USE testdb;
+
+    -- Create products table (TypeORM will also create this, but we'll ensure it exists)
+    CREATE TABLE IF NOT EXISTS products (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(50) NOT NULL,
+        code VARCHAR(50) NOT NULL,
+        createAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updateAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+
+    -- Insert sample product data
+    INSERT INTO products (id, name, code) VALUES
+        (UUID(), 'Laptop Pro 15', 'LAPTOP-001'),
+        (UUID(), 'Wireless Mouse', 'MOUSE-001'),
+        (UUID(), 'Mechanical Keyboard', 'KEYBOARD-001'),
+        (UUID(), 'USB-C Hub', 'HUB-001'),
+        (UUID(), 'External SSD 1TB', 'SSD-001'),
+        (UUID(), 'Noise-Cancelling Headphones', 'HEADPHONE-001'),
+        (UUID(), '4K Monitor 27"', 'MONITOR-001'),
+        (UUID(), 'Webcam HD', 'WEBCAM-001'),
+        (UUID(), 'Laptop Stand', 'STAND-001'),
+        (UUID(), 'Desk Mat XL', 'MAT-001');

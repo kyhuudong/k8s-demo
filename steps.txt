@@ -1,0 +1,47 @@
+# 1. Install Alpine dependencies
+apk add --no-cache gcompat conntrack-tools
+
+# 2. Install kubectl (The Remote Control)
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+mv kubectl /usr/local/bin/
+
+# 3. Install Minikube (The Cluster)
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+install minikube-linux-amd64 /usr/local/bin/minikube
+
+minikube start --driver=docker --force
+
+
+# 1. Create a directory for the project
+mkdir my-app
+cd my-app
+
+# 2. Create the HTML file
+echo "<h1>Hello from My Custom App!</h1>" > index.html
+
+# 3. Create the Dockerfile
+echo "FROM nginx:alpine" > Dockerfile
+echo "COPY index.html /usr/share/nginx/html/index.html" >> Dockerfile
+
+
+# 1. Build the image locally
+docker build -t my-custom-v1 .
+
+# 2. Load the image into Minikube
+minikube image load my-custom-v1
+
+
+# 1. Create a base deployment (starts with standard Nginx)
+kubectl create deployment my-web --image=nginx
+
+# 2. Expose the deployment to the internal network
+kubectl expose deployment my-web --type=NodePort --port=80
+
+# 3. Update to use our Custom Image
+# We use 'patch' to set the image AND enforce 'imagePullPolicy: Never' simultaneously.
+# This prevents K8s from trying to pull the image from the internet.
+kubectl patch deployment my-web --patch '{"spec": {"template": {"spec": {"containers": [{"name": "nginx", "image": "my-custom-v1", "imagePullPolicy": "Never"}]}}}}'
+
+
+kubectl port-forward --address 0.0.0.0 service/my-web 8080:80

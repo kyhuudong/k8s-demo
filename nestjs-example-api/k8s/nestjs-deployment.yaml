@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nestjs-api
+  labels:
+    app: nestjs-api
+spec:
+  # Multiple replicas for high availability
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nestjs-api
+  template:
+    metadata:
+      labels:
+        app: nestjs-api
+    spec:
+      containers:
+      - name: nestjs-api
+        image: nestjs-api:v1
+        imagePullPolicy: Never  # Use local image loaded into minikube
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: HOST
+          value: "0.0.0.0"
+        - name: PORT
+          value: "3000"
+        - name: DOMAIN_URL
+          value: "http://localhost:3000"
+        - name: TYPEORM_HOST
+          value: "mysql"
+        - name: TYPEORM_PORT
+          value: "3306"
+        - name: TYPEORM_DATABASE
+          value: "testdb"
+        - name: TYPEORM_USERNAME
+          value: "userdb"
+        - name: TYPEORM_PASSWORD
+          value: "password"
+        - name: TYPEORM_LOGGING
+          value: "false"
+        - name: TYPEORM_SYNCHRONIZE
+          value: "true"
+        # Liveness probe - restart container if it's unhealthy
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        # Readiness probe - don't send traffic until ready
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        # Resource limits and requests
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      # Restart policy
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nestjs-api
+  labels:
+    app: nestjs-api
+spec:
+  type: NodePort
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    nodePort: 30080  # Access via minikube IP on this port
+  selector:
+    app: nestjs-api

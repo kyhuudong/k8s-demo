@@ -1,0 +1,126 @@
+#!/bin/bash
+
+set -e
+
+echo "========================================="
+echo "NestJS API - Kubernetes Demo"
+echo "Complete Automation Script"
+echo "========================================="
+echo ""
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo "This script will:"
+echo "  1. Setup Kubernetes cluster (Minikube)"
+echo "  2. Build and deploy NestJS API with MySQL"
+echo "  3. Run chaos testing to demonstrate resilience"
+echo ""
+
+read -p "Do you want to proceed? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 1
+fi
+
+echo ""
+echo "========================================="
+echo "Step 1: Setting up Kubernetes Cluster"
+echo "========================================="
+echo ""
+
+./1-setup-cluster.sh
+
+echo ""
+echo -e "${GREEN}✓ Cluster setup complete!${NC}"
+echo ""
+read -p "Press Enter to continue to deployment..."
+
+echo ""
+echo "========================================="
+echo "Step 2: Building and Deploying Application"
+echo "========================================="
+echo ""
+
+./2-deploy-app.sh
+
+echo ""
+echo -e "${GREEN}✓ Application deployed successfully!${NC}"
+echo ""
+
+# Show access information
+MINIKUBE_IP=$(minikube ip)
+echo "========================================="
+echo "Application is now running!"
+echo "========================================="
+echo ""
+echo "Access your NestJS API at:"
+echo "  - API: http://$MINIKUBE_IP:30080"
+echo "  - Swagger Docs: http://$MINIKUBE_IP:30080/docs"
+echo "  - Products endpoint: http://$MINIKUBE_IP:30080/products"
+echo ""
+
+echo "You can also use port-forward:"
+echo "  kubectl port-forward service/nestjs-api 3000:3000"
+echo "  Then access: http://localhost:3000"
+echo ""
+
+read -p "Do you want to test the API now? (y/n) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "Testing API..."
+    echo ""
+    echo "GET /"
+    curl -s http://$MINIKUBE_IP:30080 | head -n 5
+    echo ""
+    echo ""
+    echo "GET /products"
+    curl -s http://$MINIKUBE_IP:30080/products | head -n 20
+    echo ""
+fi
+
+echo ""
+read -p "Press Enter to continue to chaos testing demo..."
+
+echo ""
+echo "========================================="
+echo "Step 3: Chaos Testing & Resilience Demo"
+echo "========================================="
+echo ""
+
+./3-chaos-test.sh
+
+echo ""
+echo "========================================="
+echo "All Steps Complete!"
+echo "========================================="
+echo ""
+
+echo -e "${GREEN}Your NestJS API is running on Kubernetes!${NC}"
+echo ""
+
+echo "Useful commands:"
+echo "  kubectl get pods              # List all pods"
+echo "  kubectl get services          # List all services"
+echo "  kubectl logs <pod-name>       # View pod logs"
+echo "  kubectl describe pod <name>   # Pod details"
+echo "  kubectl delete pod <name>     # Delete a pod (will auto-recreate)"
+echo "  kubectl scale deployment nestjs-api --replicas=5  # Scale to 5 pods"
+echo ""
+
+echo "To access the application:"
+echo "  minikube service nestjs-api --url"
+echo "  or"
+echo "  kubectl port-forward service/nestjs-api 3000:3000"
+echo ""
+
+echo "To clean up everything:"
+echo "  kubectl delete -f k8s/"
+echo "  minikube delete"
+echo ""
+
+echo -e "${GREEN}Demo complete! 🎉${NC}"
