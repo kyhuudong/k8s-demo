@@ -46,6 +46,14 @@ fi
 echo "✓ Minikube is running"
 echo ""
 
+# Aggressive cleanup to free disk space
+echo "Freeing up disk space..."
+echo "This may take a moment..."
+docker system prune -a -f --volumes 2>/dev/null || true
+docker builder prune -a -f 2>/dev/null || true
+echo "✓ Cleanup complete"
+echo ""
+
 # Step 1: Build the Docker image locally
 echo "Step 1: Building Docker image..."
 docker build -t nestjs-api:v1 .

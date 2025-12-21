@@ -75,9 +75,14 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Step 0: Cleaning up Docker & Minikube"
     echo "========================================="
     echo ""
-    echo "Removing unused Docker resources..."
-    docker system prune -f --volumes 2>/dev/null || true
+    echo "Removing ALL unused Docker resources..."
+    echo "This may take a moment..."
+    docker system prune -a -f --volumes 2>/dev/null || true
+    docker builder prune -a -f 2>/dev/null || true
     echo "✓ Docker cleanup complete"
+    echo ""
+    echo "Disk space freed. Checking available space..."
+    df -h / | grep -E "Filesystem|/" || df -h | head -2
     echo ""
 fi
 

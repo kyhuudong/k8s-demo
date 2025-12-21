@@ -3,16 +3,11 @@ FROM node:16-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++
-
 # Copy package files
 COPY package*.json ./
 
-# Clean npm cache and install dependencies
-RUN npm cache clean --force && \
-    npm install --legacy-peer-deps --no-optional || \
-    npm install --force --no-optional
+# Install dependencies with relaxed settings
+RUN npm install --legacy-peer-deps --no-optional || npm install --force --no-optional
 
 # Copy source code and configuration files
 COPY . .
@@ -21,25 +16,20 @@ COPY . .
 RUN npm run build
 
 # Verify build output
-RUN ls -la dist/ && \
-    test -f dist/src/main.js || \
-    (echo "Build failed: main.js not found" && exit 1)
+RUN ls -la dist/ && test -f dist/src/main.js || (echo "Build failed" && exit 1)
 
 # Production stage
 FROM node:16-alpine
 
 WORKDIR /app
 
-# Set NODE_ENV to production
 ENV NODE_ENV=production
 
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm cache clean --force && \
-    npm install --production --legacy-peer-deps --no-optional || \
-    npm install --production --force --no-optional
+# Install production dependencies
+RUN npm install --production --legacy-peer-deps --no-optional || npm install --production --force --no-optional
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
