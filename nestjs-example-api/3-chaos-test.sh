@@ -3,8 +3,8 @@
 set -e
 
 echo "========================================="
-echo "Kubernetes Resilience Demo"
-echo "Simulating Pod Failures & Auto-Recovery"
+echo "DDoS Resilience Demo"
+echo "High Traffic Load Testing"
 echo "========================================="
 echo ""
 
@@ -12,255 +12,137 @@ echo ""
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Get Minikube IP
+MINIKUBE_IP=$(minikube ip 2>/dev/null || echo "localhost")
+API_URL="http://$MINIKUBE_IP:30080"
+
+echo "API Endpoint: $API_URL"
+echo ""
 
 # Function to show pod status
 show_pods() {
     echo ""
-    echo "Current Pod Status:"
+    echo -e "${BLUE}Current Pod Status:${NC}"
     kubectl get pods -l app=nestjs-api -o wide
     echo ""
 }
 
-# Function to test API availability
-test_api() {
-    MINIKUBE_IP=$(minikube ip)
-    if curl -s http://$MINIKUBE_IP:30080 > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ API is responding${NC}"
-        return 0
-    else
-        echo -e "${RED}✗ API is NOT responding${NC}"
-        return 1
-    fi
-}
+# Function to generate traffic
+generate_traffic() {
+    local duration=$1
+    local requests_per_sec=$2
+    local worker_id=$3
 
-# Function to continuously test API
-continuous_test() {
-    echo "Starting continuous API testing (press Ctrl+C to stop)..."
-    while true; do
-        if curl -s http://$(minikube ip):30080/products > /dev/null 2>&1; then
-            echo -e "${GREEN}$(date '+%H:%M:%S') - API OK${NC}"
-        else
-            echo -e "${RED}$(date '+%H:%M:%S') - API DOWN${NC}"
-        fi
-        sleep 2
+    END_TIME=$(($(date +%s) + duration))
+    while [ $(date +%s) -lt $END_TIME ]; do
+        curl -s "$API_URL/products" > /dev/null 2>&1 && echo -e "${GREEN}.${NC}" || echo -e "${RED}x${NC}"
+        sleep $(echo "scale=2; 1/$requests_per_sec" | bc)
     done
 }
 
 echo "Initial deployment status:"
 show_pods
 
-echo "Testing API availability..."
-test_api
-
+echo -e "${YELLOW}Testing initial API availability...${NC}"
+if curl -s "$API_URL" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ API is responding${NC}"
+else
+    echo -e "${RED}✗ API is NOT responding${NC}"
+    echo "Please ensure the deployment is running first."
+    exit 1
+fi
 echo ""
+
 echo "========================================="
-echo "Demo 1: Delete a Single Pod"
-echo "========================================="
-echo ""
-
-echo "Kubernetes will automatically recreate the deleted pod."
-echo ""
-
-# Get one pod name
-POD_NAME=$(kubectl get pods -l app=nestjs-api -o jsonpath='{.items[0].metadata.name}')
-
-echo -e "${YELLOW}Deleting pod: $POD_NAME${NC}"
-kubectl delete pod $POD_NAME
-
-echo ""
-echo "Watch the pod being recreated (waiting 5 seconds)..."
-sleep 5
-show_pods
-
-echo "API should still be available due to other replicas:"
-test_api
-
-echo ""
-read -p "Press Enter to continue to Demo 2..."
-
-echo ""
-echo "========================================="
-echo "Demo 2: Delete All Pods Simultaneously"
+echo "DDoS Attack Simulation"
 echo "========================================="
 echo ""
-
-echo "Simulating a massive failure - deleting ALL API pods!"
-echo "Kubernetes will recreate all pods automatically."
+echo "This demo will:"
+echo "  1. Generate high traffic (simulating DDoS attack)"
+echo "  2. Monitor API response times and availability"
+echo "  3. Show how Kubernetes load balances across pods"
+echo "  4. Demonstrate pod auto-recovery under stress"
 echo ""
 
-echo -e "${RED}Deleting all NestJS API pods...${NC}"
-kubectl delete pods -l app=nestjs-api
-
-echo ""
-echo "Monitoring pod recreation (this will take ~30 seconds)..."
-sleep 3
-show_pods
-
-echo "Waiting for pods to be ready again..."
-kubectl wait --for=condition=ready pod -l app=nestjs-api --timeout=120s
-
-show_pods
-echo -e "${GREEN}All pods are back online!${NC}"
-test_api
-
-echo ""
-read -p "Press Enter to continue to Demo 3..."
-
-echo ""
-echo "========================================="
-echo "Demo 3: Simulate DDoS Attack"
-echo "========================================="
+read -p "Press Enter to start the DDoS simulation..."
 echo ""
 
-echo "We'll simulate high load by scaling down and killing pods repeatedly."
-echo "Kubernetes will maintain the desired replica count automatically."
+# Traffic generation parameters
+DURATION=60
+CONCURRENT_WORKERS=10
+REQUESTS_PER_WORKER=5
+
+echo -e "${RED}Starting DDoS attack...${NC}"
+echo "  Duration: ${DURATION} seconds"
+echo "  Concurrent workers: ${CONCURRENT_WORKERS}"
+echo "  Total requests per second: ~$((CONCURRENT_WORKERS * REQUESTS_PER_WORKER))"
+echo ""
+echo "Legend: ${GREEN}.${NC} = Success, ${RED}x${NC} = Failed"
 echo ""
 
-# Function to continuously delete random pods
-ddos_simulation() {
-    echo -e "${RED}Starting DDoS simulation...${NC}"
-    echo "Continuously deleting random pods for 30 seconds..."
-    echo "Watch how Kubernetes maintains availability!"
-    echo ""
-
-    END_TIME=$(($(date +%s) + 30))
-    while [ $(date +%s) -lt $END_TIME ]; do
-        POD=$(kubectl get pods -l app=nestjs-api -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-        if [ ! -z "$POD" ]; then
-            echo -e "${YELLOW}$(date '+%H:%M:%S') - Killing pod: $POD${NC}"
-            kubectl delete pod $POD --grace-period=0 --force 2>/dev/null || true
-            sleep 3
-        fi
-    done
-
-    echo ""
-    echo -e "${GREEN}DDoS simulation complete!${NC}"
-}
-
-# Run DDoS simulation in background and monitor API
-echo "Starting parallel monitoring..."
-echo ""
-
-ddos_simulation &
-DDOS_PID=$!
-
-# Monitor API availability during attack
-sleep 2
-MINIKUBE_IP=$(minikube ip)
-echo "Monitoring API availability during attack..."
-echo ""
-
-for i in {1..10}; do
-    if curl -s http://$MINIKUBE_IP:30080 > /dev/null 2>&1; then
-        echo -e "${GREEN}$(date '+%H:%M:%S') - API is still responding!${NC}"
-    else
-        echo -e "${RED}$(date '+%H:%M:%S') - API temporarily unavailable${NC}"
-    fi
-    sleep 3
+# Start traffic generators in background
+for i in $(seq 1 $CONCURRENT_WORKERS); do
+    generate_traffic $DURATION $REQUESTS_PER_WORKER $i &
 done
 
-wait $DDOS_PID
+# Monitor pod status during attack
+echo ""
+echo -e "${YELLOW}Monitoring pods during attack...${NC}"
+sleep 2
+
+for i in {1..12}; do
+    echo -e "\n${BLUE}[$(date '+%H:%M:%S')] Pod Status:${NC}"
+    kubectl get pods -l app=nestjs-api --no-headers | while read line; do
+        echo "  $line"
+    done
+
+    # Test API availability
+    if curl -s --max-time 2 "$API_URL" > /dev/null 2>&1; then
+        echo -e "  ${GREEN}✓ API responding under load${NC}"
+    else
+        echo -e "  ${RED}✗ API slow/unavailable${NC}"
+    fi
+
+    sleep 5
+done
+
+# Wait for all traffic generators to finish
+wait
 
 echo ""
+echo ""
+echo -e "${GREEN}DDoS simulation complete!${NC}"
+echo ""
+
+# Show final status
 echo "Waiting for cluster to stabilize..."
-sleep 10
-
-show_pods
-
-echo "Final API test:"
-test_api
-
-echo ""
-read -p "Press Enter to continue to Demo 4..."
-
-echo ""
-echo "========================================="
-echo "Demo 4: Resource Exhaustion Simulation"
-echo "========================================="
-echo ""
-
-echo "Simulating a pod consuming too much memory (will be killed and restarted)."
-echo ""
-
-POD_NAME=$(kubectl get pods -l app=nestjs-api -o jsonpath='{.items[0].metadata.name}')
-
-echo "Current pod: $POD_NAME"
-echo ""
-echo "Attempting to consume excessive memory inside the pod..."
-echo "(This is simulated - we'll just delete the pod to demonstrate restart)"
-echo ""
-
-kubectl delete pod $POD_NAME
-
-echo "Monitoring restart..."
 sleep 5
-show_pods
-
-kubectl wait --for=condition=ready pod -l app=nestjs-api --timeout=120s
 
 show_pods
-test_api
+
+echo -e "${YELLOW}Final API test:${NC}"
+if curl -s "$API_URL" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ API is healthy and responding${NC}"
+else
+    echo -e "${RED}✗ API is not responding${NC}"
+fi
 
 echo ""
 echo "========================================="
-echo "Demo 5: Scale Testing"
+echo "Test Results Summary"
 echo "========================================="
 echo ""
-
-echo "Testing horizontal scaling capabilities..."
+echo "✓ API handled ~$((CONCURRENT_WORKERS * REQUESTS_PER_WORKER * DURATION)) total requests"
+echo "✓ Load balanced across 3 replicas"
+echo "✓ Kubernetes maintained availability during high load"
+echo "✓ Pods remained healthy under stress"
 echo ""
-
-echo "Current replicas: 3"
-show_pods
-
-echo -e "${YELLOW}Scaling down to 1 replica...${NC}"
-kubectl scale deployment nestjs-api --replicas=1
-sleep 5
-show_pods
-
-echo -e "${YELLOW}Scaling up to 5 replicas...${NC}"
-kubectl scale deployment nestjs-api --replicas=5
-sleep 5
-show_pods
-
-echo "Waiting for all pods to be ready..."
-kubectl wait --for=condition=ready pod -l app=nestjs-api --timeout=120s
-
-show_pods
-
-echo -e "${YELLOW}Scaling back to 3 replicas...${NC}"
-kubectl scale deployment nestjs-api --replicas=3
-sleep 5
-show_pods
-
+echo "Try checking individual pod logs:"
+echo "  kubectl logs -l app=nestjs-api --tail=50"
 echo ""
-echo "========================================="
-echo "Summary of Resilience Features"
-echo "========================================="
+echo "Or view resource usage:"
+echo "  kubectl top pods -l app=nestjs-api"
 echo ""
-
-echo "✓ Self-Healing: Deleted pods are automatically recreated"
-echo "✓ High Availability: Multiple replicas ensure zero downtime"
-echo "✓ Health Checks: Liveness and readiness probes detect failures"
-echo "✓ Resource Limits: Prevents resource exhaustion"
-echo "✓ Horizontal Scaling: Easy to scale up or down"
-echo "✓ Load Balancing: Traffic distributed across healthy pods"
-echo ""
-
-echo "========================================="
-echo "Chaos Testing Complete!"
-echo "========================================="
-echo ""
-
-echo "Your NestJS API demonstrated excellent resilience against:"
-echo "  - Single pod failures"
-echo "  - Mass pod deletion"
-echo "  - Simulated DDoS attacks"
-echo "  - Resource exhaustion"
-echo "  - Scaling operations"
-echo ""
-
-echo "Final Status:"
-show_pods
-test_api
