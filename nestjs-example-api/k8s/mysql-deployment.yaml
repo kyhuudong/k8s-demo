@@ -35,6 +35,10 @@ spec:
           value: rootpassword
         - name: MYSQL_DATABASE
           value: testdb
+        - name: MYSQL_USER
+          value: userdb
+        - name: MYSQL_PASSWORD
+          value: password
         ports:
         - containerPort: 3306
           name: mysql

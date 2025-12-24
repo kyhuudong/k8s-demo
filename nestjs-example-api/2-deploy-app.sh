@@ -90,6 +90,60 @@ fi
 echo "✓ MySQL is ready"
 echo ""
 
+# Fix CoreDNS for Play with Docker environments
+echo "Step 4.5: Fixing CoreDNS for restricted environments..."
+if kubectl get pods -n kube-system -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -q "CrashLoopBackOff\|Error"; then
+    echo "⚠ CoreDNS is failing, applying privileged mode patch..."
+    kubectl patch deployment coredns -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/securityContext", "value": {"privileged": true}}]' 2>/dev/null || true
+    sleep 5
+
+    # If still failing, use hostAliases workaround
+    if kubectl get pods -n kube-system -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -q "CrashLoopBackOff\|Error"; then
+        echo "⚠ CoreDNS still failing, will use hostAliases workaround"
+
+        # Get MySQL service ClusterIP
+        MYSQL_IP=$(kubectl get svc mysql -o jsonpath='{.spec.clusterIP}')
+        echo "  MySQL Service IP: $MYSQL_IP"
+
+        # Update nestjs-deployment.yaml with hostAliases
+        if ! grep -q "hostAliases:" k8s/nestjs-deployment.yaml; then
+            echo "  Adding hostAliases to NestJS deployment..."
+            # Create temporary file with hostAliases injection
+            awk -v mysql_ip="$MYSQL_IP" '
+                /app: nestjs-api/ { labels_found=1 }
+                labels_found && /^    spec:$/ && !done {
+                    print $0
+                    print "      # Add static host entry to bypass broken CoreDNS in Play with Docker"
+                    print "      hostAliases:"
+                    print "      - ip: \"" mysql_ip "\""
+                    print "        hostnames:"
+                    print "        - \"mysql\""
+                    done=1
+                    next
+                }
+                { print }
+            ' k8s/nestjs-deployment.yaml > k8s/nestjs-deployment.yaml.tmp
+            mv k8s/nestjs-deployment.yaml.tmp k8s/nestjs-deployment.yaml
+            echo "  ✓ hostAliases added"
+        else
+            # Update existing hostAliases IP
+            awk -v mysql_ip="$MYSQL_IP" '
+                /ip: "[0-9.]+"/ && /hostAliases/,/containers:/ {
+                    gsub(/ip: "[0-9.]+"/, "ip: \"" mysql_ip "\"")
+                }
+                { print }
+            ' k8s/nestjs-deployment.yaml > k8s/nestjs-deployment.yaml.tmp
+            mv k8s/nestjs-deployment.yaml.tmp k8s/nestjs-deployment.yaml
+            echo "  ✓ hostAliases IP updated to $MYSQL_IP"
+        fi
+    else
+        echo "✓ CoreDNS is now running"
+    fi
+else
+    echo "✓ CoreDNS is running properly"
+fi
+echo ""
+
 # Step 5: Deploy NestJS application using kubectl apply
 echo "Step 5: Deploying NestJS application..."
 
