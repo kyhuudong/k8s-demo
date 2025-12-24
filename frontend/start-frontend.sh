@@ -76,10 +76,7 @@ echo "  docker-compose down             # Stop and remove container"
 echo "  docker-compose restart          # Restart the container"
 echo ""
 
-echo -e "${YELLOW}Container is running in the background.${NC}"
-echo "Press Ctrl+C to return to terminal (container will keep running)"
+echo -e "${GREEN}✓ Container is running in the background!${NC}"
+echo "  Access the page at: http://localhost:3000"
 echo ""
-
-# Show logs
-docker-compose logs -f
 
