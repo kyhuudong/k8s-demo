@@ -197,59 +197,7 @@ echo ""
 echo -e "${GREEN}Your NestJS API is running on Kubernetes!${NC}"
 echo ""
 
-echo ""
-read -p "Do you want to start the Thank You frontend page? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo ""
-    echo "========================================="
-    echo "Step 4: Starting Thank You Frontend"
-    echo "========================================="
-    echo ""
-    
-    # Check if frontend exists
-    if [ ! -d "../frontend" ]; then
-        echo "❌ Frontend directory not found!"
-        echo "Expected location: ../frontend"
-    else
-        cd ../frontend
-        
-        # Check if node_modules exists
-        if [ ! -d "node_modules" ]; then
-            echo "Installing frontend dependencies..."
-            echo "This may take a few minutes..."
-            npm install
-            echo "✓ Dependencies installed"
-            echo ""
-        fi
-        
-        echo -e "${GREEN}Starting React development server...${NC}"
-        echo ""
-        echo "The frontend will be available at:"
-        echo "  - Local: http://localhost:3000"
-        echo ""
-        echo "To access from internet (port forwarding):"
-        echo "  1. Open another terminal"
-        echo "  2. Run: ssh -R 80:localhost:3000 serveo.net"
-        echo "  3. Or use ngrok: ngrok http 3000"
-        echo ""
-        echo "Press Ctrl+C to stop the frontend server"
-        echo ""
-        
-        # Start the React app (this will block)
-        npm start
-        
-        cd - > /dev/null
-    fi
-fi
-
-echo ""
-echo "========================================="
-echo "Useful Commands"
-echo "========================================="
-echo ""
-
-echo "Kubernetes commands:"
+echo "Useful commands:"
 echo "  kubectl get pods              # List all pods"
 echo "  kubectl get services          # List all services"
 echo "  kubectl logs <pod-name>       # View pod logs"
@@ -258,21 +206,10 @@ echo "  kubectl delete pod <name>     # Delete a pod (will auto-recreate)"
 echo "  kubectl scale deployment nestjs-api --replicas=5  # Scale to 5 pods"
 echo ""
 
-echo "To access the API:"
+echo "To access the application:"
 echo "  minikube service nestjs-api --url"
 echo "  or"
 echo "  kubectl port-forward service/nestjs-api 3000:3000"
-echo ""
-
-echo "To access frontend from internet:"
-echo "  Option 1 - serveo.net (free, no signup):"
-echo "    ssh -R 80:localhost:3000 serveo.net"
-echo ""
-echo "  Option 2 - ngrok (requires signup):"
-echo "    ngrok http 3000"
-echo ""
-echo "  Option 3 - localtunnel (npm):"
-echo "    npx localtunnel --port 3000"
 echo ""
 
 echo "To clean up everything:"
