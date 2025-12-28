@@ -32,14 +32,12 @@ function App() {
       <div className="container">
         <div className="video-container">
           <iframe
-            width="480"
-            height="270"
-            src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&loop=1&playlist=dQw4w9WgXcQ"
-            title="70s Vibes"
+            className="retro-video"
+            src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ&controls=0&modestbranding=1"
+            title="Rick Roll"
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
-            className="retro-video"
           ></iframe>
         </div>
 
