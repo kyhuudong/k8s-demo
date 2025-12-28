@@ -17,7 +17,7 @@ function App() {
       {floatingImages.map((img) => (
         <img
           key={img.id}
-          src="/profile-pic.jpg"
+          src="/IMG_7630.png"
           alt="Profile"
           className="floating-profile"
           style={{
@@ -46,7 +46,6 @@ function App() {
         <h1 className="retro-text">
           <span className="groovy">Thank You</span>
           <span className="peace">for Listening!</span>
-          <span className="peace">Very nice have a good day !</span>
         </h1>
       </div>
     </div>
