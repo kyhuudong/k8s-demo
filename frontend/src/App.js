@@ -35,7 +35,6 @@ function App() {
             className="retro-video"
             autoPlay
             loop
-            muted
             playsInline
             controls
           >
