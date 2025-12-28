@@ -60,6 +60,7 @@ html, body {
   background-size: 300% 300%;
   animation: groovyGradient 8s ease infinite, fadeInScale 1.5s ease-out;
   display: inline-block;
+  position: relative;
 }
 
 .retro-video {
@@ -68,6 +69,46 @@ html, body {
   max-width: 100%;
   width: 480px;
   height: 270px;
+}
+
+.play-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 20px;
+  cursor: pointer;
+  z-index: 10;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.play-button {
+  font-family: 'Righteous', cursive;
+  font-size: 2rem;
+  color: white;
+  background: linear-gradient(45deg, #ff00ff, #00ffff, #ffff00);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: groovyGradient 3s ease infinite;
+  padding: 20px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+}
+
+@keyframes pulse {
+  0%, 100% {
+    background: rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    background: rgba(0, 0, 0, 0.4);
+  }
 }
 
 .retro-text {
