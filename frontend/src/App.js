@@ -1,10 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React from 'react';
 import './App.css';
 
 function App() {
-  const videoRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
   // Generate random positions for floating images
   const floatingImages = Array.from({ length: 8 }, (_, i) => ({
     id: i,
@@ -13,34 +10,6 @@ function App() {
     delay: Math.random() * 5, // Random animation delay
     duration: 15 + Math.random() * 10, // 15-25s animation
   }));
-
-  const handlePlayWithSound = () => {
-    if (videoRef.current && !isPlaying) {
-      videoRef.current.muted = false;
-      videoRef.current.play();
-      setIsPlaying(true);
-    }
-  };
-
-  // Listen for ANY user interaction to start playing with sound
-  useEffect(() => {
-    const handleInteraction = () => {
-      handlePlayWithSound();
-    };
-
-    // Listen for multiple types of interactions
-    document.addEventListener('click', handleInteraction);
-    document.addEventListener('keydown', handleInteraction);
-    document.addEventListener('mousemove', handleInteraction, { once: true });
-    document.addEventListener('touchstart', handleInteraction);
-
-    return () => {
-      document.removeEventListener('click', handleInteraction);
-      document.removeEventListener('keydown', handleInteraction);
-      document.removeEventListener('mousemove', handleInteraction);
-      document.removeEventListener('touchstart', handleInteraction);
-    };
-  }, [isPlaying]);
 
   return (
     <div className="App">
@@ -63,7 +32,6 @@ function App() {
       <div className="container">
         <div className="video-container">
           <video
-            ref={videoRef}
             className="retro-video"
             autoPlay
             loop

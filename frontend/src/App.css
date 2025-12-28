@@ -71,6 +71,45 @@ html, body {
   height: 270px;
 }
 
+.start-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  z-index: 100;
+  backdrop-filter: blur(5px);
+}
+
+.start-button {
+  font-family: 'Righteous', cursive;
+  font-size: 4rem;
+  color: white;
+  background: linear-gradient(45deg, #ff00ff, #00ffff, #ffff00, #ff00ff);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: groovyGradient 3s ease infinite, bounce 2s ease-in-out infinite;
+  padding: 40px;
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8));
+  text-align: center;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
 .play-overlay {
   position: absolute;
   top: 0;
