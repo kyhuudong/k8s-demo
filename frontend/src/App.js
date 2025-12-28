@@ -31,14 +31,17 @@ function App() {
 
       <div className="container">
         <div className="video-container">
-          <iframe
+          <video
             className="retro-video"
-            src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&loop=1&playlist=dQw4w9WgXcQ&controls=0&modestbranding=1"
-            title="Rick Roll"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          ></iframe>
+            autoPlay
+            loop
+            muted
+            playsInline
+            controls
+          >
+            <source src="https://dn721809.ca.archive.org/0/items/youtube-xvFZjo5PgG0/xvFZjo5PgG0.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
         </div>
 
         <h1 className="retro-text">
