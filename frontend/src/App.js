@@ -33,9 +33,7 @@ function App() {
         <div className="video-container">
           <video
             className="retro-video"
-            autoPlay
             loop
-            muted
             playsInline
             controls
           >
