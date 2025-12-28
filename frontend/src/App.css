@@ -1,7 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Righteous&family=Permanent+Marker&display=swap');
 
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 .App {
-  min-height: 100vh;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -11,6 +24,7 @@
   background-size: 400% 400%;
   animation: groovyGradient 15s ease infinite;
   overflow: hidden;
+  position: relative;
 }
 
 @keyframes groovyGradient {
@@ -33,7 +47,7 @@
 }
 
 .video-container {
-  margin-bottom: 50px;
+  margin-bottom: 30px;
   animation: fadeInScale 1.5s ease-out;
   border: 8px solid #fff;
   border-radius: 20px;
@@ -52,17 +66,17 @@
   display: block;
   border-radius: 12px;
   max-width: 100%;
-  width: 560px;
-  height: 315px;
+  width: 480px;
+  height: 270px;
 }
 
 .retro-text {
   font-family: 'Righteous', cursive;
-  font-size: 5rem;
+  font-size: 3rem;
   font-weight: 900;
   text-align: center;
   margin: 0;
-  padding: 30px;
+  padding: 20px 30px;
   display: flex;
   flex-direction: column;
   gap: 10px;
