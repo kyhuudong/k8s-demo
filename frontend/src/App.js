@@ -5,15 +5,23 @@ function App() {
   return (
     <div className="App">
       <div className="container">
-        <h1 className="title">Thank You for Listening</h1>
-
-        <div className="image-container">
-          <img
-            src="https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.png"
-            alt="Kubernetes Logo"
-            className="logo"
-          />
+        <div className="video-container">
+          <iframe
+            width="560"
+            height="315"
+            src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+            title="70s Vibes"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="retro-video"
+          ></iframe>
         </div>
+
+        <h1 className="retro-text">
+          <span className="groovy">Thank You</span>
+          <span className="peace">for Listening!</span>
+        </h1>
       </div>
     </div>
   );
