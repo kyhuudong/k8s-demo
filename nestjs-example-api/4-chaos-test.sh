@@ -219,9 +219,9 @@ QUICK_SUCCESS=0
 QUICK_FAIL=0
 for i in {1..10}; do
     if curl -s --max-time 2 "$API_URL/products" > /dev/null 2>&1; then
-        ((QUICK_SUCCESS++))
+        QUICK_SUCCESS=$((QUICK_SUCCESS + 1))
     else
-        ((QUICK_FAIL++))
+        QUICK_FAIL=$((QUICK_FAIL + 1))
     fi
 done
 
