@@ -283,12 +283,15 @@ echo -e "${CYAN}Starting traffic generators...${NC}"
 echo ""
 
 # Start traffic generators in background
+TRAFFIC_PIDS=()
 for i in $(seq 1 $CONCURRENT_WORKERS); do
     generate_traffic $((PRE_UPDATE_TIME + UPDATE_DURATION)) $REQUESTS_PER_WORKER $i &
+    TRAFFIC_PIDS+=($!)
 done
 
 # Start uptime monitor in background
 monitor_uptime $((PRE_UPDATE_TIME + UPDATE_DURATION)) &
+MONITOR_PID=$!
 
 echo -e "${GREEN}✓ Traffic generation started${NC}"
 echo -e "${GREEN}✓ Uptime monitoring started${NC}"
