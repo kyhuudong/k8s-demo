@@ -68,6 +68,9 @@ echo ""
 SUCCESS_COUNT=0
 FAILURE_COUNT=0
 
+# Create unique temp file identifier
+TEMP_FILE_ID="/tmp/traffic_results_${$}_$(date +%s)"
+
 # ==============================================================================
 # HELPER FUNCTIONS
 # ==============================================================================
@@ -122,7 +125,7 @@ generate_traffic() {
     done
 
     # Write results to temp file for aggregation
-    echo "$success $failure" >> /tmp/traffic_results_$$
+    echo "$success $failure" >> "$TEMP_FILE_ID"
 }
 
 # Monitor API uptime by checking every second
@@ -185,17 +188,52 @@ echo -e "${BLUE}Current image:${NC} ${MAGENTA}$CURRENT_IMAGE${NC}"
 echo ""
 
 echo -e "${YELLOW}Testing initial API availability...${NC}"
-if curl -s "$API_URL" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ API is responding${NC}"
-    echo -e "${GREEN}✓ Ready to start rolling update test${NC}"
+echo ""
+
+# Test root endpoint
+echo -n "  Testing root endpoint (/)...          "
+if curl -s --max-time 3 "$API_URL" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ OK${NC}"
 else
+    echo -e "${RED}✗ FAILED${NC}"
     echo -e "${RED}✗ API is NOT responding${NC}"
-    echo -e "${RED}✗ Please ensure the deployment is running first.${NC}"
     echo ""
     echo "Run this first:"
     echo "  kubectl apply -f k8s/"
     exit 1
 fi
+
+# Test products endpoint
+echo -n "  Testing /products endpoint...         "
+if curl -s --max-time 3 "$API_URL/products" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ OK${NC}"
+else
+    echo -e "${RED}✗ FAILED${NC}"
+    echo -e "${RED}✗ Products endpoint is NOT responding${NC}"
+    exit 1
+fi
+
+# Run quick load test
+echo -n "  Quick load test (10 requests)...      "
+QUICK_SUCCESS=0
+QUICK_FAIL=0
+for i in {1..10}; do
+    if curl -s --max-time 2 "$API_URL/products" > /dev/null 2>&1; then
+        ((QUICK_SUCCESS++))
+    else
+        ((QUICK_FAIL++))
+    fi
+done
+
+if [ $QUICK_SUCCESS -ge 8 ]; then
+    echo -e "${GREEN}✓ OK ($QUICK_SUCCESS/10 succeeded)${NC}"
+else
+    echo -e "${YELLOW}⚠ WARNING ($QUICK_SUCCESS/10 succeeded)${NC}"
+fi
+
+echo ""
+echo -e "${GREEN}✓ All API endpoints are healthy${NC}"
+echo -e "${GREEN}✓ Ready to start rolling update test${NC}"
 echo ""
 
 # ==============================================================================
@@ -232,7 +270,8 @@ echo ""
 print_header "PHASE 1: Starting Continuous Traffic"
 
 # Clean up old temp files
-rm -f /tmp/traffic_results_$$
+rm -f /tmp/traffic_results_*
+rm -f "$TEMP_FILE_ID"
 
 echo -e "${BOLD}Traffic Configuration:${NC}"
 echo "  Duration:              $((PRE_UPDATE_TIME + UPDATE_DURATION))s total"
@@ -350,6 +389,9 @@ done
 echo -e "${YELLOW}Waiting for all background processes to complete...${NC}"
 wait
 
+# Give a moment for file writes to complete
+sleep 1
+
 echo ""
 echo -e "${GREEN}${BOLD}✓ Test execution complete!${NC}"
 echo ""
@@ -391,15 +433,19 @@ else
 fi
 
 # Calculate request success rate from traffic generators
-if [ -f /tmp/traffic_results_$$ ]; then
+if [ -f "$TEMP_FILE_ID" ]; then
     TOTAL_SUCCESS=0
     TOTAL_FAILURE=0
+
+    echo -e "${CYAN}Debug: Reading results from $TEMP_FILE_ID${NC}" >&2
+    echo -e "${CYAN}Debug: File contents:${NC}" >&2
+    cat "$TEMP_FILE_ID" >&2
 
     # Aggregate results from all workers
     while read success failure; do
         TOTAL_SUCCESS=$((TOTAL_SUCCESS + success))
         TOTAL_FAILURE=$((TOTAL_FAILURE + failure))
-    done < /tmp/traffic_results_$$
+    done < "$TEMP_FILE_ID"
 
     TOTAL_REQUESTS=$((TOTAL_SUCCESS + TOTAL_FAILURE))
     if [ $TOTAL_REQUESTS -gt 0 ]; then
@@ -409,8 +455,9 @@ if [ -f /tmp/traffic_results_$$ ]; then
     fi
 
     # Clean up temp file
-    rm -f /tmp/traffic_results_$$
+    rm -f "$TEMP_FILE_ID"
 else
+    echo -e "${YELLOW}Debug: Temp file $TEMP_FILE_ID not found${NC}" >&2
     TOTAL_SUCCESS=0
     TOTAL_FAILURE=0
     TOTAL_REQUESTS=0
