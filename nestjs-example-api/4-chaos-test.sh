@@ -3,21 +3,21 @@
 set -e
 
 # ==============================================================================
-# KUBERNETES HIGH AVAILABILITY CHAOS TEST
+# KUBERNETES ROLLING UPDATE CHAOS TEST
 # ==============================================================================
-# This script demonstrates Kubernetes self-healing and high availability by:
-# 1. Generating continuous API traffic
-# 2. Simulating a pod failure (chaos engineering)
-# 3. Measuring uptime and success rate during recovery
-# 4. Verifying automatic pod recreation
+# This script demonstrates Kubernetes zero-downtime deployment by:
+# 1. Generating continuous API traffic during update
+# 2. Simulating a deployment update (new version rollout)
+# 3. Measuring uptime and success rate during rolling update
+# 4. Verifying zero downtime and gradual pod replacement
 # ==============================================================================
 
 clear
 
-echo "========================================="
-echo "High Availability Demo (99%+ Uptime)"
-echo "Pod Failure & Auto-Recovery Under Load"
-echo "========================================="
+echo "================================================"
+echo "Zero-Downtime Deployment Demo"
+echo "Rolling Update Under Continuous Load"
+echo "================================================"
 echo ""
 
 # ==============================================================================
@@ -25,12 +25,12 @@ echo ""
 # ==============================================================================
 
 # Test duration and traffic parameters
-DURATION=45                 # Total test duration in seconds (reduced for faster demo)
+UPDATE_DURATION=60          # Duration to run traffic during update
 CONCURRENT_WORKERS=3        # Number of parallel traffic generators
 REQUESTS_PER_WORKER=2       # Requests per second per worker
-STABILIZATION_TIME=5        # Time to wait before chaos (seconds)
-RECOVERY_CHECKS=6           # Number of status checks during recovery
-RECOVERY_CHECK_INTERVAL=5   # Seconds between recovery checks
+PRE_UPDATE_TIME=5           # Time to run traffic before update
+STATUS_CHECKS=8             # Number of status checks during update
+CHECK_INTERVAL=5            # Seconds between status checks
 
 # ==============================================================================
 # COLOR DEFINITIONS
@@ -55,7 +55,7 @@ API_URL="http://$MINIKUBE_IP:30080"
 
 echo -e "${BOLD}Configuration:${NC}"
 echo "  API Endpoint:         $API_URL"
-echo "  Test Duration:        ${DURATION}s"
+echo "  Update Duration:      ${UPDATE_DURATION}s"
 echo "  Traffic Workers:      ${CONCURRENT_WORKERS}"
 echo "  Requests/Worker/sec:  ${REQUESTS_PER_WORKER}"
 echo "  Total RPS:            ~$((CONCURRENT_WORKERS * REQUESTS_PER_WORKER))"
@@ -118,7 +118,7 @@ generate_traffic() {
         fi
 
         # Calculate sleep time based on requests per second
-        sleep $(echo "scale=2; 1/$requests_per_sec" | bc 2>/dev/null || echo "0.2")
+        sleep $(echo "scale=2; 1/$requests_per_sec" | bc 2>/dev/null || echo "0.5")
     done
 
     # Write results to temp file for aggregation
@@ -179,10 +179,15 @@ print_header "INITIAL STATUS CHECK"
 echo -e "${YELLOW}Checking deployment status...${NC}"
 show_pods
 
+# Get current image version
+CURRENT_IMAGE=$(kubectl get deployment nestjs-api -o jsonpath='{.spec.template.spec.containers[0].image}')
+echo -e "${BLUE}Current image:${NC} ${MAGENTA}$CURRENT_IMAGE${NC}"
+echo ""
+
 echo -e "${YELLOW}Testing initial API availability...${NC}"
 if curl -s "$API_URL" > /dev/null 2>&1; then
     echo -e "${GREEN}✓ API is responding${NC}"
-    echo -e "${GREEN}✓ Ready to start chaos test${NC}"
+    echo -e "${GREEN}✓ Ready to start rolling update test${NC}"
 else
     echo -e "${RED}✗ API is NOT responding${NC}"
     echo -e "${RED}✗ Please ensure the deployment is running first.${NC}"
@@ -197,28 +202,27 @@ echo ""
 # TEST SCENARIO DESCRIPTION
 # ==============================================================================
 
-print_header "TEST SCENARIO: Pod Failure During High Traffic"
+print_header "TEST SCENARIO: Zero-Downtime Rolling Update"
 
 echo -e "${BOLD}What this test demonstrates:${NC}"
 echo ""
-echo -e "  ${CYAN}1.${NC} ${BOLD}Self-Healing:${NC} Kubernetes automatically recreates failed pods"
-echo -e "  ${CYAN}2.${NC} ${BOLD}High Availability:${NC} Remaining pods handle traffic during recovery"
-echo -e "  ${CYAN}3.${NC} ${BOLD}Load Balancing:${NC} Service distributes requests across healthy pods"
-echo -e "  ${CYAN}4.${NC} ${BOLD}Zero Downtime:${NC} Service maintains 99%+ uptime during failures"
+echo -e "  ${CYAN}1.${NC} ${BOLD}Rolling Updates:${NC} Gradual replacement of pods with new version"
+echo -e "  ${CYAN}2.${NC} ${BOLD}Zero Downtime:${NC} Service continues during entire update process"
+echo -e "  ${CYAN}3.${NC} ${BOLD}Load Balancing:${NC} Traffic shifts from old to new pods gracefully"
+echo -e "  ${CYAN}4.${NC} ${BOLD}Health Checks:${NC} New pods verified before old ones terminated"
 echo ""
 echo -e "${BOLD}Test steps:${NC}"
 echo ""
-echo -e "  ${GREEN}→${NC} Phase 1: Start continuous high traffic to the API (${DURATION}s)"
-echo -e "  ${GREEN}→${NC} Phase 2: Kill one pod to simulate a real failure"
-echo -e "  ${GREEN}→${NC} Phase 3: Monitor API availability and auto-recovery"
-echo -e "  ${GREEN}→${NC} Phase 4: Calculate uptime and success metrics"
+echo -e "  ${GREEN}→${NC} Phase 1: Start continuous traffic to the API"
+echo -e "  ${GREEN}→${NC} Phase 2: Trigger rolling update (simulated new version)"
+echo -e "  ${GREEN}→${NC} Phase 3: Monitor pod replacement and API availability"
+echo -e "  ${GREEN}→${NC} Phase 4: Verify 100% uptime during entire update"
 echo ""
-echo -e "${YELLOW}${BOLD}Note:${NC} You'll see live traffic indicators:"
-echo -e "       ${GREEN}.${NC} = Successful request"
-echo -e "       ${RED}x${NC} = Failed request"
+echo -e "${YELLOW}${BOLD}Note:${NC} You'll see pods gradually replaced:"
+echo -e "       ${YELLOW}Old pods${NC} → ${CYAN}New pods${NC} (one at a time)"
 echo ""
 
-read -p "Press Enter to start the chaos test..."
+read -p "Press Enter to start the rolling update test..."
 echo ""
 
 # ==============================================================================
@@ -231,7 +235,7 @@ print_header "PHASE 1: Starting Continuous Traffic"
 rm -f /tmp/traffic_results_$$
 
 echo -e "${BOLD}Traffic Configuration:${NC}"
-echo "  Duration:              ${DURATION} seconds"
+echo "  Duration:              $((PRE_UPDATE_TIME + UPDATE_DURATION))s total"
 echo "  Concurrent workers:    ${CONCURRENT_WORKERS}"
 echo "  Requests/sec (total):  ~$((CONCURRENT_WORKERS * REQUESTS_PER_WORKER))"
 echo "  Endpoint:              $API_URL/products"
@@ -241,13 +245,11 @@ echo ""
 
 # Start traffic generators in background
 for i in $(seq 1 $CONCURRENT_WORKERS); do
-    generate_traffic $DURATION $REQUESTS_PER_WORKER $i &
+    generate_traffic $((PRE_UPDATE_TIME + UPDATE_DURATION)) $REQUESTS_PER_WORKER $i &
 done
-TRAFFIC_PIDS=$!
 
 # Start uptime monitor in background
-monitor_uptime $DURATION &
-MONITOR_PID=$!
+monitor_uptime $((PRE_UPDATE_TIME + UPDATE_DURATION)) &
 
 echo -e "${GREEN}✓ Traffic generation started${NC}"
 echo -e "${GREEN}✓ Uptime monitoring started${NC}"
@@ -255,74 +257,65 @@ echo ""
 echo -e "Live traffic indicators: ${GREEN}.${NC} = success, ${RED}x${NC} = failure"
 echo ""
 
-# Wait for traffic to stabilize before introducing chaos
-echo -e "${YELLOW}Waiting ${STABILIZATION_TIME}s for traffic to stabilize...${NC}"
-for i in $(seq 1 $STABILIZATION_TIME); do
+# Wait for traffic to stabilize
+echo -e "${YELLOW}Running baseline traffic for ${PRE_UPDATE_TIME}s...${NC}"
+for i in $(seq 1 $PRE_UPDATE_TIME); do
     echo -n "."
     sleep 1
 done
 echo ""
 echo ""
 
-# Show current status before chaos
-echo -e "${BLUE}${BOLD}[$(date '+%H:%M:%S')] Status Before Chaos:${NC}"
-print_separator
-kubectl get pods -l app=nestjs-api --no-headers | while read line; do
-    echo -e "  ${GREEN}✓ $line${NC}"
-done
-print_separator
-echo -e "${GREEN}All pods are healthy and serving traffic${NC}"
-echo ""
-sleep 3
-
 # ==============================================================================
-# PHASE 2: INTRODUCE CHAOS (POD FAILURE)
+# PHASE 2: TRIGGER ROLLING UPDATE
 # ==============================================================================
 
-print_header "PHASE 2: Introducing Chaos - Simulating Pod Failure"
+print_header "PHASE 2: Triggering Rolling Update"
 
-POD_TO_KILL=$(kubectl get pods -l app=nestjs-api -o jsonpath='{.items[0].metadata.name}')
-
-echo -e "${YELLOW}${BOLD}⚠ Simulating real-world pod failure...${NC}"
+echo -e "${YELLOW}${BOLD}Simulating deployment update...${NC}"
 echo ""
-echo -e "  Target pod:     ${MAGENTA}$POD_TO_KILL${NC}"
-echo -e "  Action:         ${RED}Force delete (immediate termination)${NC}"
-echo -e "  Expected:       ${CYAN}Traffic continues via remaining pods${NC}"
+echo -e "  Update strategy:   ${CYAN}RollingUpdate${NC}"
+echo -e "  MaxSurge:          ${CYAN}1${NC} (max 1 extra pod during update)"
+echo -e "  MaxUnavailable:    ${CYAN}0${NC} (always maintain min replicas)"
 echo ""
 
-kubectl delete pod $POD_TO_KILL --grace-period=0 --force 2>/dev/null
+# Simulate update by adding/changing an annotation (doesn't actually change image)
+# This triggers a rolling restart
+echo -e "${CYAN}Triggering update by adding annotation...${NC}"
+kubectl patch deployment nestjs-api -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"rolling-update-test\":\"$(date +%s)\"}}}}}"
 
-echo -e "${RED}${BOLD}  ✗ Pod deleted!${NC}"
-echo -e "${YELLOW}  → Kubernetes should now detect the missing pod...${NC}"
-echo -e "${YELLOW}  → Expected to auto-create a replacement pod...${NC}"
+echo -e "${GREEN}✓ Rolling update triggered!${NC}"
 echo ""
 sleep 2
 
 # ==============================================================================
-# PHASE 3: MONITOR AUTO-RECOVERY
+# PHASE 3: MONITOR ROLLING UPDATE
 # ==============================================================================
 
-print_header "PHASE 3: Monitoring Kubernetes Auto-Recovery"
+print_header "PHASE 3: Monitoring Rolling Update Progress"
 
-echo -e "${CYAN}Watching pod status and API availability...${NC}"
-echo -e "${CYAN}Check interval: every ${RECOVERY_CHECK_INTERVAL}s${NC}"
+echo -e "${CYAN}Watching pod replacement process...${NC}"
 echo ""
 
-for i in $(seq 1 $RECOVERY_CHECKS); do
-    echo -e "${BLUE}${BOLD}[$(date '+%H:%M:%S')] Recovery Check $i/$RECOVERY_CHECKS${NC}"
+for i in $(seq 1 $STATUS_CHECKS); do
+    echo -e "${BLUE}${BOLD}[$(date '+%H:%M:%S')] Update Check $i/$STATUS_CHECKS${NC}"
     print_separator
 
-    # Display pod status with color coding
+    # Display pod status with age
     kubectl get pods -l app=nestjs-api --no-headers | while read line; do
         STATUS=$(echo $line | awk '{print $3}')
-        POD_NAME=$(echo $line | awk '{print $1}')
+        AGE=$(echo $line | awk '{print $5}')
 
         if [[ "$STATUS" == "Running" ]]; then
-            echo -e "  ${GREEN}✓ $line${NC}"
+            if [[ "$AGE" =~ ^[0-9]+s$ ]] || [[ "$AGE" =~ ^[0-9]+m$ && ${AGE%m} -lt 3 ]]; then
+                echo -e "  ${CYAN}⟳ $line ${BOLD}(NEW POD)${NC}"
+            else
+                echo -e "  ${YELLOW}○ $line ${BOLD}(OLD POD)${NC}"
+            fi
         elif [[ "$STATUS" == "ContainerCreating" ]] || [[ "$STATUS" == "Pending" ]]; then
-            echo -e "  ${YELLOW}⟳ $line ${BOLD}(recreating...)${NC}"
+            echo -e "  ${CYAN}⟳ $line ${BOLD}(creating new pod...)${NC}"
         elif [[ "$STATUS" == "Terminating" ]]; then
-            echo -e "  ${RED}⤓ $line ${BOLD}(terminating...)${NC}"
+            echo -e "  ${YELLOW}⤓ $line ${BOLD}(terminating old pod...)${NC}"
         else
             echo -e "  ${RED}✗ $line${NC}"
         fi
@@ -330,22 +323,30 @@ for i in $(seq 1 $RECOVERY_CHECKS); do
 
     print_separator
 
-    # Check API availability during recovery
-    if curl -s --max-time 2 "$API_URL" > /dev/null 2>&1; then
-        echo -e "  ${GREEN}${BOLD}✓ API STILL RESPONDING${NC} ${CYAN}(traffic handled by healthy pods)${NC}"
+    # Check rollout status
+    ROLLOUT_STATUS=$(kubectl rollout status deployment/nestjs-api --timeout=1s 2>&1 || echo "in progress")
+
+    if [[ "$ROLLOUT_STATUS" == *"successfully rolled out"* ]]; then
+        echo -e "  ${GREEN}${BOLD}✓ ROLLOUT COMPLETE - All pods updated!${NC}"
     else
-        echo -e "  ${YELLOW}⚠ API response slow${NC} ${CYAN}(may indicate temporary overload)${NC}"
+        echo -e "  ${CYAN}⟳ Rolling update in progress...${NC}"
+    fi
+
+    # Check API availability during update
+    if curl -s --max-time 2 "$API_URL" > /dev/null 2>&1; then
+        echo -e "  ${GREEN}${BOLD}✓ API RESPONDING${NC} ${CYAN}(zero downtime maintained)${NC}"
+    else
+        echo -e "  ${RED}⚠ API slow/unavailable${NC}"
     fi
     echo ""
 
-    sleep $RECOVERY_CHECK_INTERVAL
+    sleep $CHECK_INTERVAL
 done
 
 # ==============================================================================
 # WAIT FOR TEST COMPLETION
 # ==============================================================================
 
-# Wait for all background jobs (traffic generators and uptime monitor)
 echo -e "${YELLOW}Waiting for all background processes to complete...${NC}"
 wait
 
@@ -359,10 +360,15 @@ echo ""
 
 print_header "FINAL STATUS VERIFICATION"
 
-echo -e "${YELLOW}Waiting for cluster to stabilize...${NC}"
-sleep 5
+echo -e "${YELLOW}Waiting for rollout to complete...${NC}"
+kubectl rollout status deployment/nestjs-api --timeout=30s
 
 show_pods
+
+# Get new image version
+NEW_IMAGE=$(kubectl get deployment nestjs-api -o jsonpath='{.spec.template.spec.containers[0].image}')
+echo -e "${BLUE}Updated image:${NC} ${MAGENTA}$NEW_IMAGE${NC}"
+echo ""
 
 echo -e "${BOLD}Final API health check:${NC}"
 if curl -s "$API_URL" > /dev/null 2>&1; then
@@ -415,7 +421,7 @@ fi
 # TEST RESULTS SUMMARY
 # ==============================================================================
 
-print_header "HIGH AVAILABILITY TEST RESULTS"
+print_header "ZERO-DOWNTIME DEPLOYMENT TEST RESULTS"
 
 echo -e "${BOLD}${CYAN}📊 Uptime Monitoring${NC} ${CYAN}(health checks every second):${NC}"
 echo ""
@@ -441,25 +447,26 @@ echo ""
 
 echo -e "${BOLD}${CYAN}📝 What Happened During the Test:${NC}"
 echo ""
-echo -e "  ${GREEN}1.${NC} Continuous traffic was handled by ${BOLD}3 pods${NC}"
-echo -e "  ${RED}2.${NC} One pod was ${BOLD}forcefully killed${NC} (simulating real failure)"
-echo -e "  ${GREEN}3.${NC} Traffic ${BOLD}automatically continued${NC} via remaining 2 pods"
-echo -e "  ${GREEN}4.${NC} Kubernetes ${BOLD}auto-created${NC} a new pod to maintain 3 replicas"
-echo -e "  ${GREEN}5.${NC} Service maintained ${BOLD}${UPTIME_PERCENT}%${NC} uptime during failure & recovery"
+echo -e "  ${GREEN}1.${NC} Continuous traffic started hitting the API"
+echo -e "  ${CYAN}2.${NC} Rolling update triggered with ${BOLD}RollingUpdate strategy${NC}"
+echo -e "  ${CYAN}3.${NC} Pods replaced ${BOLD}one at a time${NC} (not all at once)"
+echo -e "  ${GREEN}4.${NC} New pods verified healthy ${BOLD}before${NC} old ones terminated"
+echo -e "  ${GREEN}5.${NC} Traffic seamlessly shifted from old to new pods"
+echo -e "  ${GREEN}6.${NC} Service maintained ${BOLD}${UPTIME_PERCENT}%${NC} uptime during entire update"
 echo ""
 print_separator
 echo ""
 
 # Evaluate results
-if (( $(echo "$UPTIME_PERCENT >= 99" | bc -l) )); then
-    echo -e "${GREEN}${BOLD}✓ SUCCESS: Achieved 99%+ uptime despite pod failure!${NC}"
-    echo -e "${GREEN}${BOLD}✓ High availability objective met!${NC}"
-elif (( $(echo "$UPTIME_PERCENT >= 95" | bc -l) )); then
-    echo -e "${YELLOW}${BOLD}⚠ GOOD: Achieved ${UPTIME_PERCENT}% uptime${NC}"
-    echo -e "${YELLOW}  (slight degradation during recovery, but still highly available)${NC}"
+if (( $(echo "$UPTIME_PERCENT >= 99.5" | bc -l) )); then
+    echo -e "${GREEN}${BOLD}✓ EXCELLENT: Achieved 99.5%+ uptime during rolling update!${NC}"
+    echo -e "${GREEN}${BOLD}✓ True zero-downtime deployment!${NC}"
+elif (( $(echo "$UPTIME_PERCENT >= 98" | bc -l) )); then
+    echo -e "${GREEN}${BOLD}✓ GOOD: Achieved ${UPTIME_PERCENT}% uptime${NC}"
+    echo -e "${GREEN}  (minimal disruption during pod transitions)${NC}"
 else
-    echo -e "${RED}${BOLD}⚠ Uptime: ${UPTIME_PERCENT}%${NC}"
-    echo -e "${YELLOW}  (more degradation than expected - check pod resources/health)${NC}"
+    echo -e "${YELLOW}${BOLD}⚠ Uptime: ${UPTIME_PERCENT}%${NC}"
+    echo -e "${YELLOW}  (some disruption detected - check readiness probes)${NC}"
 fi
 echo ""
 print_separator
@@ -467,29 +474,28 @@ echo ""
 
 echo -e "${BOLD}${CYAN}🎓 Key Kubernetes Concepts Demonstrated:${NC}"
 echo ""
-echo -e "  ${BOLD}• Self-Healing:${NC}       Failed pods automatically recreated by ReplicaSet"
-echo -e "  ${BOLD}• High Availability:${NC}  Multiple replicas ensure continuous service"
-echo -e "  ${BOLD}• Load Balancing:${NC}     Service distributes traffic across healthy pods"
-echo -e "  ${BOLD}• Resilience:${NC}         System recovered without manual intervention"
-echo -e "  ${BOLD}• Zero Downtime:${NC}      Service stayed online during pod failure"
+echo -e "  ${BOLD}• Rolling Updates:${NC}     Gradual pod replacement strategy"
+echo -e "  ${BOLD}• Zero Downtime:${NC}       Service available throughout update"
+echo -e "  ${BOLD}• MaxSurge/MaxUnavailable:${NC} Controls update speed and safety"
+echo -e "  ${BOLD}• Health Checks:${NC}       Readiness probes verify new pods"
+echo -e "  ${BOLD}• Traffic Shifting:${NC}    Load balancer adapts to pod changes"
 echo ""
 print_separator
 echo ""
 
 echo -e "${BOLD}${CYAN}🔍 Next Steps - Explore Further:${NC}"
 echo ""
-echo "  View pod logs:"
-echo -e "    ${CYAN}kubectl logs -l app=nestjs-api --tail=50${NC}"
+echo "  Check rollout history:"
+echo -e "    ${CYAN}kubectl rollout history deployment/nestjs-api${NC}"
 echo ""
-echo "  Check pod events:"
-echo -e "    ${CYAN}kubectl get events --sort-by='.lastTimestamp' | grep nestjs-api${NC}"
+echo "  View deployment strategy:"
+echo -e "    ${CYAN}kubectl describe deployment nestjs-api | grep -A 5 Strategy${NC}"
 echo ""
-echo "  Describe a pod:"
-echo -e "    ${CYAN}kubectl describe pod -l app=nestjs-api | head -50${NC}"
+echo "  Rollback to previous version:"
+echo -e "    ${CYAN}kubectl rollout undo deployment/nestjs-api${NC}"
 echo ""
-echo "  Watch pods in real-time:"
-echo -e "    ${CYAN}kubectl get pods -l app=nestjs-api --watch${NC}"
+echo "  Watch rollout in real-time:"
+echo -e "    ${CYAN}kubectl rollout status deployment/nestjs-api --watch${NC}"
 echo ""
 echo -e "${GREEN}${BOLD}Test completed successfully!${NC}"
 echo ""
-
