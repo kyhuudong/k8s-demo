@@ -2,9 +2,13 @@ import React from 'react';
 import './App.css';
 
 function App() {
+  // Array of profile images
+  const profileImages = ['/IMG_7630.png', '/Image_20260206_151354_091.png'];
+
   // Generate random positions for floating images
   const floatingImages = Array.from({ length: 8 }, (_, i) => ({
     id: i,
+    src: profileImages[Math.floor(Math.random() * profileImages.length)], // Random image
     top: Math.random() * 80 + 10, // 10-90% from top
     left: Math.random() * 80 + 10, // 10-90% from left
     delay: Math.random() * 5, // Random animation delay
@@ -17,7 +21,7 @@ function App() {
       {floatingImages.map((img) => (
         <img
           key={img.id}
-          src="/IMG_7630.png"
+          src={img.src}
           alt="Profile"
           className="floating-profile"
           style={{

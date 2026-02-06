@@ -39,11 +39,11 @@ echo ""
 
 # Build and start the container
 echo "Building Docker image..."
-docker-compose build
+docker compose build
 
 echo ""
 echo "Starting container..."
-docker-compose up -d
+docker compose up -d
 
 echo ""
 echo -e "${GREEN}✓ Frontend is now running in Docker!${NC}"
@@ -70,10 +70,10 @@ echo "  3. Or use the platform's port forwarding feature"
 echo ""
 
 echo -e "${CYAN}Useful Commands:${NC}"
-echo "  docker-compose logs -f          # View logs"
-echo "  docker-compose stop             # Stop the container"
-echo "  docker-compose down             # Stop and remove container"
-echo "  docker-compose restart          # Restart the container"
+echo "  docker compose logs -f          # View logs"
+echo "  docker compose stop             # Stop the container"
+echo "  docker compose down             # Stop and remove container"
+echo "  docker compose restart          # Restart the container"
 echo ""
 
 echo -e "${GREEN}✓ Container is running in the background!${NC}"
